@@ -1,22 +1,25 @@
-"""Request/response models for the runs API."""
+"""Domain models for analyst-visible run results."""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
-class RunRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=100_000)
-    instruction: str = Field(
-        default="Summarize the text in one short paragraph.",
-        min_length=1,
-        max_length=2_000,
-    )
+class AnalystRunRequest(BaseModel):
+    workspace_id: str = Field(...)
+    question: str = Field(..., min_length=1, max_length=1000)
+    insights_toggle: bool = Field(default=False)
 
 
-class RunResult(BaseModel):
+class AnalystRunResult(BaseModel):
     run_id: str
     status: str
+    answer: str | None = None
     output_text: str | None = None
+    table: dict | None = None
+    chart_spec: dict | None = None
+    sql_suggestion: str | None = None
+    follow_ups: list[str] = []
+    anomalies: list[str] = []
     provider: str | None = None
     model: str | None = None
     error_message: str | None = None

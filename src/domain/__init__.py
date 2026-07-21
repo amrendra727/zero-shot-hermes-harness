@@ -1,4 +1,11 @@
-"""Domain models (Pydantic request/response shapes)."""
-from src.domain.run import RunRequest, RunResult
+"""Domain package exports."""
+from __future__ import annotations
 
-__all__ = ["RunRequest", "RunResult"]
+from src.domain.run import AnalystRunRequest, AnalystRunResult, RunRequest, RunResult
+
+__all__ = [
+    "AnalystRunRequest",
+    "AnalystRunResult",
+    "RunRequest",
+    "RunResult",
+]

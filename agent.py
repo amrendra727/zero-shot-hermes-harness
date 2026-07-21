@@ -95,9 +95,12 @@ def verify() -> int:
 
     # 4. Unit tests (no key needed)
     print("\nUnit tests:")
+    env = os.environ.copy()
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/unit/", "-q"],
         cwd=ROOT,
+        env=env,
         capture_output=True,
         text=True,
     )

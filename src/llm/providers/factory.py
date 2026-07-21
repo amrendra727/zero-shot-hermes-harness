@@ -10,6 +10,7 @@ from src.config.settings import get_settings
 from src.llm.providers.anthropic import AnthropicProvider
 from src.llm.providers.base import LLMError, LLMProvider
 from src.llm.providers.gemini import GeminiProvider
+from src.llm.providers.nim import NIMProvider
 from src.llm.providers.openrouter import OpenRouterProvider
 
 
@@ -26,8 +27,12 @@ def create_llm_provider() -> LLMProvider:
         return OpenRouterProvider(
             api_key=s.openrouter_api_key, model=model, base_url=s.openrouter_base_url
         )
+    if provider == "nim":
+        return NIMProvider(
+            api_key=s.nim_api_key, model=model or s.nim_model, base_url=s.nim_base_url
+        )
     raise LLMError(
         "No LLM API key configured. Set exactly one of AGENT_ANTHROPIC_API_KEY, "
-        "AGENT_GEMINI_API_KEY, or AGENT_OPENROUTER_API_KEY in .env "
+        "AGENT_GEMINI_API_KEY, AGENT_OPENROUTER_API_KEY, or AGENT_NIM_API_KEY in .env "
         "(see .env.example)."
     )

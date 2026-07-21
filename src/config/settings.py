@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="")
     openrouter_api_key: str = Field(default="")
     openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    nim_api_key: str = Field(default="")
+    nim_base_url: str = Field(default="https://integrate.api.nvidia.com/v1")
+    nim_model: str = Field(default="meta/llama-3-70b-instruct")
 
     log_level: str = Field(default="INFO")
 
@@ -50,6 +53,8 @@ class Settings(BaseSettings):
             return "gemini"
         if self.openrouter_api_key:
             return "openrouter"
+        if self.nim_api_key:
+            return "nim"
         return "stub"
 
     def resolve_model(self) -> str:

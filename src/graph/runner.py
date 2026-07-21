@@ -8,35 +8,44 @@ from __future__ import annotations
 from src.db.models import RunRow
 from src.db.session import create_db_session
 from src.graph.agent import agentic_ai
-from src.graph.state import AgentState
+from src.graph.state import AnalystState
 from src.observability.events import get_logger, log_span
 
 
-def run_agent(input_text: str, instruction: str) -> str:
+def run_agent(workspace_id: str, question: str, insights_toggle: bool = False) -> str:
     log = get_logger("runner")
 
     with create_db_session() as session:
-        run = RunRow(input_text=input_text, instruction=instruction, status="running")
+        run = RunRow(
+            input_text=question,
+            instruction="analyst-qna",
+            status="running",
+        )
         session.add(run)
         session.flush()
         run_id = run.id
 
-    initial: AgentState = {
+    initial: AnalystState = {
         "run_id": run_id,
-        "input_text": input_text,
-        "instruction": instruction,
+        "workspace_id": workspace_id,
+        "source_type": "csv",
+        "question": question,
+        "insights_toggle": insights_toggle,
         "error": None,
     }
     with log_span(log, "agent_run", run_id=run_id) as span:
-        final: AgentState = agentic_ai.invoke(initial)
-        span["status"] = final.get("status", "completed")
+        final_state: AnalystState = agentic_ai.invoke(initial)
+        span["status"] = final_state.get("status", "completed")
 
+    output_text = final_state.get("answer") or final_state.get("output_text") or ""
     with create_db_session() as session:
         run = session.get(RunRow, run_id)
-        run.status = final.get("status", "completed")
-        run.output_text = final.get("output_text")
-        run.provider = final.get("provider")
-        run.model = final.get("model")
-        run.error_message = final.get("error")
+        if run is None:
+            raise RuntimeError("Run row vanished mid-flight.")
+        run.output_text = output_text
+        run.provider = final_state.get("provider")
+        run.model = final_state.get("model")
+        run.status = final_state.get("status", "completed")
+        run.error_message = final_state.get("error")
 
     return run_id

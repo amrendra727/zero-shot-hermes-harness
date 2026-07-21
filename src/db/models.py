@@ -39,3 +39,64 @@ class RunRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=_now, onupdate=_now
     )
+
+
+class Workspace(Base):
+    """Collection root for a CSV workspace, e.g. UP Police data analyst workspace."""
+
+    __tablename__ = "workspace"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now, onupdate=_now
+    )
+
+
+class Dataset(Base):
+    """Uploaded dataset within a workspace, normalized toward CSV use."""
+
+    __tablename__ = "dataset"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    source_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False, default="text/csv")
+    storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    row_count: Mapped[int | None] = mapped_column(nullable=True)
+    column_count: Mapped[int | None] = mapped_column(nullable=True)
+    checksum: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now, onupdate=_now
+    )
+
+
+class Artifact(Base):
+    """Generated or stored artifact tied to a dataset or run."""
+
+    __tablename__ = "artifact"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=_uuid)
+    dataset_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    run_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default="file")
+    filename: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    byte_size: Mapped[int | None] = mapped_column(nullable=True)
+    meta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, default=_now, onupdate=_now
+    )
