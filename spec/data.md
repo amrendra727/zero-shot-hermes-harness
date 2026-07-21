@@ -1,34 +1,32 @@
-# Data Model
 
-> Fill in this section — see comments below.
+# Data — UP Police Data Analyst Agent
 
----
+## Workspace Metadata
 
-## Storage Technology
+| Entity | Purpose | Storage |
+| --- | --- | --- |
+| workspace | User-created investigation workspace | SQLite via SQLAlchemy |
+| dataset | Uploaded CSV metadata for a workspace | SQLite via SQLAlchemy |
+| run | One question/answer trace | SQLite via SQLAlchemy |
+| artifact | Chart/report file references | SQLite + filesystem under `artifacts/` |
 
-<!-- FILL IN: What database/storage does this project use and why? -->
+## CSV Data Contract
 
-## Entities
+- Each uploaded CSV becomes a `dataset` with inferred column names,
+  types, and sample values.
+- The agent never mutates the uploaded file; transformations are read
+  operations or derived views.
+- Large CSV support uses chunked parsing into queryable in-memory
+  structures; phase 1 keeps it simple and bounded.
 
-<!-- FILL IN: One section per major entity. -->
+## MsSQL Data Contract (Phase 2)
 
-### Entity: <!-- Name -->
+- Read-only account with parameterized queries only.
+- Preferred access path: cached summary tables refreshed on schedule
+  by DBA, not by the agent runtime.
+- Connection details supplied via `.env` template; never committed.
 
-<!-- FILL IN: What does this entity represent? -->
+## Retention
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| id | <!-- type --> | yes | Primary key |
-| <!-- field --> | <!-- type --> | <!-- yes/no --> | <!-- description --> |
-
-### Relationships
-
-<!-- FILL IN: How do entities relate to each other? -->
-
-## Data Lifecycle
-
-<!-- FILL IN: When is data created, updated, and deleted? Is anything time-boxed or archived? -->
-
-## Sensitive Data
-
-<!-- FILL IN: What fields contain PII or secrets? How are they protected? -->
+- Workspace metadata retained until user deletes workspace.
+- Artifact files retained until cleanup job removes old runs.

@@ -1,68 +1,80 @@
-# Architecture
 
-> Fill in this section — see comments below.
-
----
+# Architecture — UP Police Data Analyst Agent
 
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+The agent is a FastAPI service that exposes a web UI, REST API, CLI,
+and batch runner around one runtime: a LangGraph agent whose job is to
+turn a natural-language question over a configured data source into an
+answer with supporting evidence.
 
-## Component Map
+In Phase 1 the data source is user-uploaded CSV(s). In Phase 2 a live
+MsSQL source is added with cached summaries to keep DB load low.
 
-<!-- FILL IN: List the major components and what each does. -->
+## Components
 
-```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
-```
-
-## Layers
-
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
-| Layer | Responsibility |
-|-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+- **API layer** — FastAPI routes under `src/api/`. Serves the static
+  frontend at `/app`, health at `/health`, and workspace/runs routes
+  at `/api/v1/...`.
+- **Workspace store** — `src/db/` using SQLAlchemy on SQLite for the
+  app metadata: runs, workspaces, uploaded files, cached questions,
+  artifacts. Does not store production police data in Phase 1 unless
+  necessary; prefer ephemeral columnar processing for CSV payloads.
+- **Data ingestion** — CSV parsing + schema inference using Python
+  stdlib / pandas-light path. Streaming ingestion for large files.
+- **Agent runtime** — LangGraph state machine in `src/graph/` with
+  nodes: intake/plan, tool selection, execute query, format outputs,
+  surface SQL, optional follow-up suggestions.
+- **LLM provider layer** — OpenAI-compatible client wired to NVIDIA
+  NIM in `.env`. Used for NL planning, SQL generation, summarization,
+  anomaly flagging, and chart suggestion text.
+- **Observability** — `src/observability/` structured log of request
+  summary, latency, error class, workspace id, source type.
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
+```
+User
+  │
+  ▼
+Frontend / REST / CLI / Batch runner
+  │
+  ▼
+API layer
+  │
+  ▼
+Agent runtime
+  │   ├─ CSV workspace
+  │   │    ├─ Parse uploaded CSV(s)
+  │   │    ├─ Profile schema + sample values
+  │   │    └─ Load into in-memory / temp dataset view
+  │   │
+  │   └─ MsSQL workspace  ← Phase 2
+  │       ├─ Read summary cache
+  │       └─ Issue parameterized queries through Db session
+  ▼
+LLM provider via NIM
+  │
+  ▼
+Formatted response → UI / API / artifact download
+```
 
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+## Deployment / runtime
 
-## External Dependencies
-
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
-| Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+- Local-first.
+- Network boundary enforced by deployment: bind to `127.0.0.1`, no
+  outbound exfil routes configured.
+- `.env` never committed; secrets stay on host.
 
 ## Stack
 
-> This project's concrete technology choices (captured at intake, filled by the spec-writer). The generic, every-project rules — model-naming, DB driver, dev port, test environment — live in `harness/patterns/tech-stack.md`; this section is only what **this** project picked.
-
-- **Language:** <!-- FILL IN: e.g., Python 3.12 -->
-- **Agent framework:** <!-- FILL IN: e.g., LangGraph / custom / none -->
-- **LLM provider + model:** <!-- FILL IN: e.g., Anthropic / claude-sonnet-4-6 -->
-- **Backend:** <!-- FILL IN: e.g., FastAPI / none -->
-- **Database + ORM:** <!-- FILL IN: e.g., PostgreSQL + SQLAlchemy 2.0 / none -->
-- **Frontend:** <!-- FILL IN: e.g., Next.js / none -->
-- **Dependency management:** <!-- FILL IN: e.g., uv + pyproject.toml -->
-
-| Key library | Version | Purpose |
-|-------------|---------|---------|
-| <!-- name --> | <!-- ver --> | <!-- purpose --> |
-
-**Avoid:** <!-- FILL IN: libraries/patterns explicitly off-limits, and why -->
-
-## Deployment Model
-
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+- **Language:** Python 3.11+
+- **API:** FastAPI + uvicorn
+- **Agent framework:** LangGraph
+- **DB / workspace metadata:** SQLAlchemy + SQLite
+- **LLM provider:** NVIDIA NIM, OpenAI-compatible HTTP client
+- **Frontend:** zero-build static app in `frontend/public/`
+- **Package manager:** uv
+- **Migrations:** Alembic
+- **Observability:** structlog
+- **Tests:** pytest

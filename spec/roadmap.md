@@ -1,62 +1,118 @@
-# Roadmap
 
-> Fill in each section. Run `/zero-shot-build [your idea]` to have it filled automatically.
+# Roadmap — UP Police Data Analyst Agent
 
----
+## Purpose
 
-## What This Agent Does
-
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+A narrow, domain-specific analyst agent for the UP Police. It ingests
+police-domain CSV exports and live MsSQL data, answers natural-language
+questions, and returns plain-language answers, tables, charts, ranked
+lists, downloadable outputs, and SQL suggestions. It is built for
+occasional ad-hoc use, review-meeting walkthroughs, zone-level analyst
+runs, and overnight batch jobs.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
-
-## Core Problem Being Solved
-
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+- Station in-charge during crime-review meetings.
+- Analysts working across a range/zone.
+- Overnight batch runs producing scheduled outputs.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+- A non-technical user can paste or upload a CSV, type a question in
+  plain English, and receive a correct answer with supporting evidence
+  in under 10 seconds for small inputs.
+- A user can return to an earlier workspace and see prior questions,
+  answers, and files.
+- A user can switch from a CSV workspace to a live MsSQL workspace
+  without leaving the app.
+- Advanced queries produce SQL suggestions the user can inspect, copy,
+  or request explain.
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+## Core Constraints
 
-## What This Agent Does NOT Do (Out of Scope)
+- Data/results never leave the APBN/MP machine/network boundary.
+- Provider key stays local in `.env`; no external credential sync.
+- Inference cost is hidden from the user; vectorized/minimal LLM usage.
+- Live MsSQL access is read-only; no write-back from the agent.
 
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+## Out of Scope
 
-## Key Constraints
+- User auth, role-based access control, SSO.
+- Incident/fIR writeback into MsSQL.
+- Multi-language translation beyond question/answer IO.
+- Mobile app.
 
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
+---
 
 ## Phases of Development
 
-<!-- FILL IN: The spec-writer fills these in. One phase = one user-testable increment, behind a human testing gate. Default each phase's slices to INDEPENDENT so generators build them concurrently; declare a dependency only when a slice truly needs another's output. Use the per-phase template below — one block per phase. -->
+### Phase 1 — CSV Workspace + NL Q&A (smallest first-time-right win)
 
-> **Phase 1 is the smallest first-time-right user-testable win.** It must work perfectly the first time the user tests it — zero rough edges on the tested path. Its backend is minimal but REAL on the one core path (no fake data on the tested path). Its frontend is visually complete: real UI for the one working path PLUS clearly-labelled NON-FUNCTIONAL stubs for everything coming later, so the user sees the vision (a stub must never be mistaken for a bug). Each later phase wires those stubs into real functionality, one increment at a time.
+**Goal.** Upload CSV(s), ask questions in plain English, get answers,
+tables, charts, ranked lists, downloadable reports, and SQL suggestions;
+revisit the workspace later.
 
-### Phase 1 — <!-- short name -->
+**Independent slices.**
+- CSV ingestion + schema inference
+- Workspace persistence
+- NL-to-SQL/reasoning node + answer renderer
+- API + frontend surfaces
 
-- **Goal:** <!-- FILL IN: the single smallest user-testable win this phase delivers. -->
-- **Independent slices (parallel build units):** <!-- FILL IN: each slice is a disjoint unit a single generator owns. Note its surface (frontend / backend) and any declared dependency on another slice (default: none). -->
-  - `slice-a` (backend) — <!-- what it builds; deps: none -->
-  - `slice-b` (frontend) — <!-- what it builds; deps: none -->
-- **Key surfaces / files:** <!-- FILL IN: the files/dirs each slice touches. frontend writes the frontend surface; backend writes src/. Never the same file. -->
-- **Gate command:** <!-- FILL IN: one exact runnable command that proves the phase works — real LLM/API via .env keys, production DB driver (never SQLite-as-substitute). e.g. `uv run pytest tests/test_phase1.py` -->
-- **How the user tests it (handoff seed):** <!-- FILL IN: exact run command(s), what to click / look at, the expected result, and which parts are labelled stubs vs real. -->
+**Key surfaces/files.**
+- `src/graph/nodes.py`: `transform_text` becomes `analyse_question`
+- `src/prompts/transform.md` → `src/prompts/analyst.md`
+- `src/api/runs.py` extensions for workspace CRUD + result streaming
+- `frontend/public/` new upload + workspace view
+- `tests/unit/`, `tests/integration/`
 
-### Phase 2 — <!-- short name -->
+**Gate.**
+```bash
+uv sync
+cp .env.example .env
+uv run pytest tests/unit -q
+uv run python agent.py --run &
+for i in {1..20}; do curl -sf http://localhost:8001/health && break || sleep 2; done
+curl -sf http://localhost:8001/app/ > /dev/null
+uv run pytest tests/integration -q
+```
+Real LLM/API via `.env`; NIM provider call must return 200.
 
-- **Goal:** <!-- FILL IN: next user-testable increment (typically wires a Phase-1 stub into real functionality). -->
-- **Independent slices (parallel build units):**
-  - `slice-a` (backend) — <!-- ...; deps: none -->
-  - `slice-b` (frontend) — <!-- ...; deps: none -->
-- **Key surfaces / files:** <!-- FILL IN -->
-- **Gate command:** <!-- FILL IN: exact runnable command, real LLM/API + production DB driver -->
-- **How the user tests it (handoff seed):** <!-- FILL IN -->
+**How the user tests it.**
+1. Open the app; upload one CSV.
+2. Ask: "Top 5 stations by total incidents."
+3. Expect NL answer + table + chart + SQL suggestion in one response.
 
-<!-- Repeat the per-phase block for every phase. -->
+---
 
+### Phase 2 — MsSQL + Query Cache + Batch Access
+
+**Goal.** Connect workspace data source to a live MsSQL instance using
+cached summarized views and low-load query patterns; add CLI + batch
+job access.
+
+**Independent slices.**
+- MsSQL read-only provider with connection-pool/cache controls
+- Query plan cache / materialized summary layer
+- CLI entry point
+- Scheduled batch job runner
+
+**Key surfaces/files.**
+- `src/llm/providers/mssql.py`
+- `src/db/session.py` extension for MsSQL + cache config
+- `src/domain/run.py` extensions for source switching
+- `scripts/` batch runner
+- CLI endpoint
+
+**Gate.**
+```bash
+uv run pytest tests/integration -q -k "mssql"
+uv run python agent.py --run &
+for i in {1..20}; do curl -sf http://localhost:8001/health && break || sleep 2; done
+# Batch job runner self-test
+uv run python scripts/batch_job.py --help
+```
+
+**How the user tests it.**
+1. Configure MsSQL connection template in `.env`.
+2. Start app; switch source from CSV to MsSQL.
+3. Ask same question; expect answer from DB with same UI.

@@ -1,32 +1,54 @@
-# UI
 
-> **Boilerplate status:** Delete this file if the agent has no UI. Otherwise, filled in by the spec-writer sub-agent.
-
----
+# UI — UP Police Data Analyst
 
 ## UI Type
 
-<!-- FILL IN: Web dashboard / CLI / chat interface / none -->
+Web dashboard served at `/app` from the FastAPI backend.
 
 ## Views / Screens
 
-<!-- FILL IN: One section per major view. -->
+### Screen: Workspace list
 
-### Screen: <!-- Name -->
-
-**Purpose:** <!-- what the user does here -->
+**Purpose.** Choose or create an investigation workspace.
 
 **Key elements:**
-- <!-- element 1 -->
-- <!-- element 2 -->
+- Workspace list/table
+- Create workspace form
 
 **Actions available:**
-- <!-- action 1 -->
+- Create workspace
+- Open workspace
+
+### Screen: Workspace detail
+
+**Purpose.** Query and inspect results within one workspace.
+
+**Key elements:**
+- Dataset upload panel
+- Question input
+- Answer panel
+- Table viewer
+- Chart viewer
+- SQL expander
+- Steps/trail expander
+- Follow-up suggestions
+- Artifact download controls
+
+**Actions available:**
+- Upload CSV
+- Ask question
+- Toggle insights
+- Download report/output
+- Copy SQL
 
 ## Error States
 
-<!-- FILL IN: How does the UI surface errors and loading states to the user? -->
+- Schema ambiguity: show inferred types + allow manual override.
+- Empty result: show “no rows match this question.”
+- Provider failure: show retry action with degraded guidance.
+- Upload failure: show file parse error + row/column hints.
 
 ## Tech Stack
 
-<!-- FILL IN: Filled in by spec-writer. E.g., Next.js 15 + React 19 + Tailwind -->
+Zero-build static frontend: `frontend/public/` — `index.html`,
+`styles.css`, `app.js`. No npm/build step in Phase 1.
