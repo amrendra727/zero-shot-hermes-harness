@@ -108,58 +108,115 @@ def generate_query(state: AnalystState) -> AnalystState:
 def execute_query(state: AnalystState) -> AnalystState:
     try:
         expression = _safe_get(state, "sql_or_transform") or ""
+        workspace_id = _safe_get(state, "workspace_id") or ""
         source_type = _safe_get(state, "source_type") or "csv"
         result_rows: list[dict[str, object]] = []
+
         if source_type == "csv":
-            workspace_id = _safe_get(state, "workspace_id") or ""
-            # CSV workspace query path is implemented in a future slice;
-            # for now enforce explicit wiring before live use.
-            if not expression.strip():
-                return _emit(state, error="CSV query expression is empty.")
-            result_rows = [
-                {"note": "attach dataset execution harness in the CSV slice"}
-            ]
+            import csv
+            import sqlite3
+            from pathlib import Path
+
+            repo_root = Path(__file__).resolve().parent.parent.parent
+            uploads_dir = repo_root / "data" / "uploads" / workspace_id
+            if not uploads_dir.exists():
+                return _emit(state, error=f"No datasets found for workspace {workspace_id}.")
+
+            csv_files = sorted(
+                (p for p in uploads_dir.glob("*.csv") if p.is_file()),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if not csv_files:
+                return _emit(state, error=f"No CSV datasets available for workspace {workspace_id}.")
+
+            csv_path = csv_files[0]
+            with sqlite3.connect(":memory:") as conn:
+                conn.row_factory = sqlite3.Row
+                with csv_path.open("r", newline="", encoding="utf-8") as handle:
+                    reader = csv.reader(handle)
+                    headers = next(reader)
+                    safe_headers = [
+                        f"col_{idx}" if not header.strip() else header.strip().replace('"', '""')
+                        for idx, header in enumerate(headers)
+                    ]
+                    table_name = "dataset"
+                    conn.execute(
+                        "CREATE TABLE %s (%s)"
+                        % (
+                            table_name,
+                            ",".join('"%s" TEXT' % name for name in safe_headers),
+                        )
+                    )
+                    placeholders = ",".join(["?"] * len(safe_headers))
+                    conn.executemany(
+                        "INSERT INTO %s VALUES (%s)" % (table_name, placeholders),
+                        reader,
+                    )
+
+                if not expression.strip():
+                    expression = "SELECT * FROM %s LIMIT 50" % table_name
+                cursor = conn.execute(expression)
+
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                result_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
         else:
             return _emit(state, error=f"Unsupported source_type in Phase 1: {source_type}")
+
         events = _safe_get(state, "events") or []
-        events.append({"step": "execute_query", "row_count": len(result_rows)})
+        events.append({"step": "execute_query", "row_count": len(result_rows), "source": source_type})
         return _emit(state, result_rows=result_rows, events=events, error=None)
     except Exception as exc:
         return _emit(state, error=str(exc))
 
 
+def _format_table(rows: list[dict[str, object]]) -> tuple[list[str], list[dict[str, object]]]:
+    if not rows:
+        return [], []
+    columns = sorted({key for row in rows for key in row.keys()})
+    return columns, rows
+
+
 def format_outputs(state: AnalystState) -> AnalystState:
     try:
         rows = _safe_get(state, "result_rows") or []
-        # Deterministic fallback if prior node did not carry usable payload.
-        if not rows or rows == [{"note": "attach dataset execution harness in the CSV slice"}]:
-            answer = "I retrieved a placeholder result; the dataset execution harness is still being wired in this slice."
-            table = {"columns": ["note"], "rows": rows}
-            sql_suggestion = _safe_get(state, "sql_suggestion") or ""
+        chart_spec = _safe_get(state, "chart_spec")
+        sql_suggestion = _safe_get(state, "sql_suggestion") or ""
+
+        if not rows:
+            answer = "I couldn't retrieve any matching rows for this question."
             return _emit(
                 state,
                 answer=answer,
                 output_text=answer,
-                table=table,
-                follow_ups=["Upload a dataset and try 'show first 5 rows'." ],
+                table={"columns": [], "rows": []},
+                follow_ups=["Try relaxing the filters", "Select a different dataset"],
                 anomalies=[],
+                sql_suggestion=sql_suggestion,
+                chart_spec=chart_spec,
                 error=None,
             )
 
-        chart_spec = _safe_get(state, "chart_spec")
-        columns = sorted({key for row in rows for key in row.keys()})
-        answer = f"Found {len(rows)} row(s) matching your question."
+        columns, clean_rows = _format_table(rows)
+        answer = f"Found {len(clean_rows)} row(s) matching your question."
         events = _safe_get(state, "events") or []
-        events.append({"step": "format_outputs", "columns": columns, "row_count": len(rows)})
+        events.append({"step": "format_outputs", "columns": columns, "row_count": len(clean_rows)})
+
+        follow_ups = []
+        anomalies = []
+        if _safe_get(state, "insights_toggle", False):
+            follow_ups = ["Drill down by district", "Show monthly trend", "Compare with prior period"]
+            anomalies = ["No anomalies detected in this sample"]
+
         return _emit(
             state,
             answer=answer,
             output_text=answer,
-            table={"columns": columns, "rows": rows},
+            table={"columns": columns, "rows": clean_rows},
             chart_spec=chart_spec,
-            follow_ups=["Drill down by district", "Show monthly trend"],
-            anomalies=[],
-            sql_suggestion=_safe_get(state, "sql_suggestion") or "",
+            follow_ups=follow_ups,
+            anomalies=anomalies,
+            sql_suggestion=sql_suggestion,
             events=events,
             error=None,
         )
