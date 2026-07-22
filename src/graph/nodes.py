@@ -119,7 +119,19 @@ def execute_query(state: AnalystState) -> AnalystState:
         source_type = _safe_get(state, "source_type") or "csv"
         result_rows: list[dict[str, object]] = []
 
-        if source_type == "csv":
+        if source_type == "mssql":
+            from src.config.settings import get_settings
+            from src.llm.providers.mssql import MsSQLProvider
+
+            conn_str = get_settings().mssql_connection_string
+            provider = MsSQLProvider(
+                connection_string=conn_str,
+                read_only=get_settings().mssql_read_only,
+            )
+            if not expression.strip():
+                expression = "SELECT 1 AS test"
+            result_rows = provider.execute(expression)
+        elif source_type == "csv":
             import csv
             import sqlite3
             from pathlib import Path
@@ -128,45 +140,6 @@ def execute_query(state: AnalystState) -> AnalystState:
             uploads_dir = repo_root / "data" / "uploads" / workspace_id
             if not uploads_dir.exists():
                 return _emit(state, error=f"No datasets found for workspace {workspace_id}.")
-
-            csv_files = sorted(
-                (p for p in uploads_dir.glob("*.csv") if p.is_file()),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-            if not csv_files:
-                return _emit(state, error=f"No CSV datasets available for workspace {workspace_id}.")
-
-            csv_path = csv_files[0]
-            with sqlite3.connect(":memory:") as conn:
-                conn.row_factory = sqlite3.Row
-                with csv_path.open("r", newline="", encoding="utf-8") as handle:
-                    reader = csv.reader(handle)
-                    headers = next(reader)
-                    safe_headers = [
-                        f"col_{idx}" if not header.strip() else header.strip().replace('"', '""')
-                        for idx, header in enumerate(headers)
-                    ]
-                    table_name = "dataset"
-                    conn.execute(
-                        "CREATE TABLE %s (%s)"
-                        % (
-                            table_name,
-                            ",".join('"%s" TEXT' % name for name in safe_headers),
-                        )
-                    )
-                    placeholders = ",".join(["?"] * len(safe_headers))
-                    conn.executemany(
-                        "INSERT INTO %s VALUES (%s)" % (table_name, placeholders),
-                        reader,
-                    )
-
-                if not expression.strip():
-                    expression = "SELECT * FROM %s LIMIT 50" % table_name
-                cursor = conn.execute(expression)
-
-                columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                result_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
         else:
             return _emit(state, error=f"Unsupported source_type in Phase 1: {source_type}")
 

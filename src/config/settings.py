@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     nim_api_key: str = Field(default="")
     nim_base_url: str = Field(default="https://integrate.api.nvidia.com/v1")
     nim_model: str = Field(default="meta/llama-3-70b-instruct")
+    mssql_connection_string: str = Field(default="")
+    mssql_read_only: bool = Field(default=True)
 
     log_level: str = Field(default="INFO")
 
@@ -47,6 +49,8 @@ class Settings(BaseSettings):
         p = (self.llm_provider or "auto").strip().lower()
         if p != "auto":
             return p
+        if self.mssql_connection_string:
+            return "mssql"
         if self.anthropic_api_key:
             return "anthropic"
         if self.gemini_api_key:
