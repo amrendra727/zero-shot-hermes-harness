@@ -64,14 +64,17 @@ def _process_job(job: dict[str, Any]) -> dict[str, Any]:
 
     workspace_id = str(job.get("workspace_id") or "").strip()
     question = f"Analyze dataset: {job.get('filename', '')}"
-    source_type = "csv"
+    source_type = str(job.get("source_type") or "csv").strip()
+    insights_toggle = bool(job.get("insights_toggle"))
+
+    if not workspace_id:
+        raise ValueError("missing workspace_id")
 
     run_id = run_agent(
         workspace_id=workspace_id,
         question=question,
         source_type=source_type,
         insights_toggle=insights_toggle,
-    )
     )
     with create_db_session() as session:
         row = session.get(RunRow, run_id)
