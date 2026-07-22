@@ -54,3 +54,25 @@ def test_frontend_served_at_app():
         # styles + js referenced (single-origin)
         assert "styles.css" in res.text
         assert "app.js" in res.text
+
+
+def test_upload_csv_queues_job():
+    with _client() as client:
+        create = client.post("/workspaces", json={"name": "Zone Review"})
+        assert create.status_code == 200
+        workspace_id = create.json()["data"]["id"]
+
+        file_content = b"name,incidents\nA,1\nB,2\n"
+        res = client.post(
+            f"/workspaces/{workspace_id}/datasets",
+            files={"file": ("mail_id.csv", file_content, "text/csv")},
+            data={"title": "mail_id.csv"},
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["data"]["status"] == "queued"
+        assert "job_id" in body["data"]
+
+        runs = client.get(f"/workspaces/{workspace_id}/runs")
+        assert runs.status_code == 200
+        assert "runs" in runs.json()["data"]

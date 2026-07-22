@@ -25,6 +25,7 @@
         <input id="dataset-file" type="file" accept=".csv" />
       </label>
       <button id="upload-btn">Upload CSV</button>
+      <div id="workspace-id" class="workspace-id" hidden></div>
       <div id="upload-status" class="status" hidden></div>
       <div id="upload-error" class="error" hidden></div>
     </section>
@@ -81,6 +82,12 @@
       <ul id="anomalies"></ul>
 
       <button id="download-btn">Download report</button>
+    </section>
+
+    <section class="card">
+      <h2>Workspace runs</h2>
+      <button id="refresh-runs-btn">Refresh runs</button>
+      <ul id="run-list"></ul>
     </section>
 
     <footer class="foot">

@@ -16,9 +16,15 @@ from src.db.session import get_session
 from src.domain import AnalystRunResult
 from src.graph.runner import run_agent
 
+from pydantic import BaseModel
 router = APIRouter()
 _QUEUE_DIR = Path("data") / "upload-queue"
 _QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class WorkspaceCreateIn(BaseModel):
+    name: str = "Untitled workspace"
+    description: str | None = None
 
 
 def _to_run_result(run: RunRow) -> AnalystRunResult:
@@ -49,8 +55,11 @@ def _enqueue(workspace_id: str, dataset_id: str, filename: str) -> dict[str, obj
 
 @router.post("/workspaces")
 def create_workspace(payload: dict, session: Session = Depends(get_session)) -> dict:
+    if not isinstance(payload, dict):
+        raise api_error("bad_request", "Expected JSON body.", status_code=422)
     name = str(payload.get("name") or "Untitled workspace").strip()
-    workspace = Workspace(name=name, description=payload.get("description"))
+    description = payload.get("description") if isinstance(payload, dict) else None
+    workspace = Workspace(name=name, description=description)
     session.add(workspace)
     session.flush()
     return ok({"id": workspace.id, "name": workspace.name, "created_at": workspace.created_at.isoformat() if workspace.created_at else None})
