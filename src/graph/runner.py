@@ -12,7 +12,7 @@ from src.graph.state import AnalystState
 from src.observability.events import get_logger, log_span
 
 
-def run_agent(workspace_id: str, question: str, insights_toggle: bool = False) -> str:
+def run_agent(workspace_id: str, question: str, insights_toggle: bool = False, source_type: str = "csv") -> str:
     log = get_logger("runner")
 
     with create_db_session() as session:
@@ -28,7 +28,7 @@ def run_agent(workspace_id: str, question: str, insights_toggle: bool = False) -
     initial: AnalystState = {
         "run_id": run_id,
         "workspace_id": workspace_id,
-        "source_type": "csv",
+        "source_type": source_type or "csv",
         "question": question,
         "insights_toggle": insights_toggle,
         "error": None,

@@ -30,8 +30,6 @@ def main() -> int:
     os.environ.setdefault("PYTHONPATH", str(ROOT))
 
     from src.graph.runner import run_agent  # noqa: E402
-    from src.db.session import create_db_session  # noqa: E402
-    from src.db.models import RunRow  # noqa: E402
 
     run_id = run_agent(
         workspace_id=args.workspace,

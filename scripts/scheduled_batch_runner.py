@@ -70,7 +70,8 @@ def _process_job(job: dict[str, Any]) -> dict[str, Any]:
         workspace_id=workspace_id,
         question=question,
         source_type=source_type,
-        insights_toggle=False,
+        insights_toggle=insights_toggle,
+    )
     )
     with create_db_session() as session:
         row = session.get(RunRow, run_id)
