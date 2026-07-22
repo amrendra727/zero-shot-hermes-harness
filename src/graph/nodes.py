@@ -16,18 +16,25 @@ def _emit(state: AnalystState, **kwargs: Any) -> AnalystState:
     return merged
 
 
-def transform_text(state: AnalystState) -> AnalystState:
-    """Baseline slot kept for compatibility; analyst runner bypasses this node."""
-    return _safe_get(state, "output_text") or ""
+def transform_text(state: AnalystState) -> dict:
+    """Baseline compatibility node used by tests and baseline /runs."""
+    try:
+        text = str(state.get("input_text") or "")
+        instruction = str(state.get("instruction") or "").strip().lower()
+        if instruction == "upper":
+            output = text.upper()
+        elif instruction == "lower":
+            output = text.lower()
+        else:
+            output = text
+        return {"error": None, "output_text": output, "input_text": text}
+    except Exception as exc:  # pragma: no cover — defensive
+        return {"error": str(exc)}
 
 
 def handle_error(state: AnalystState) -> AnalystState:
     err = _safe_get(state, "error")
     return _safe_get(state, "status") or ("failed" if err else "completed")
-
-
-def finalize(state: AnalystState) -> AnalystState:
-    return _safe_get(state, "status") or "completed"
 
 
 def intake_plan(state: AnalystState) -> AnalystState:
@@ -255,13 +262,15 @@ def error_handler(state: AnalystState) -> AnalystState:
 
 
 def finalize(state: AnalystState) -> AnalystState:
+    status = _safe_get(state, "status") or "completed"
     answer = _safe_get(state, "answer") or ""
     events = _safe_get(state, "events") or []
-    events.append({"step": "finalize", "answer_length": len(answer)})
+    events.append({"step": "finalize", "answer_length": len(answer), "status": status})
     return _emit(
         state,
-        status="completed",
+        status=status,
+        answer=answer,
         output_text=answer,
         events=events,
-        error=None,
+        error=_safe_get(state, "error"),
     )

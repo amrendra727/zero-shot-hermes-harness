@@ -4,6 +4,20 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class RunRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+    instruction: str = Field(default="upper")
+
+
+class RunResult(BaseModel):
+    run_id: str
+    status: str
+    output_text: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    error_message: str | None = None
+
+
 class AnalystRunRequest(BaseModel):
     workspace_id: str = Field(...)
     question: str = Field(..., min_length=1, max_length=1000)

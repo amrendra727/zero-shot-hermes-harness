@@ -38,6 +38,9 @@ def run_agent(workspace_id: str, question: str, insights_toggle: bool = False) -
         span["status"] = final_state.get("status", "completed")
 
     output_text = final_state.get("answer") or final_state.get("output_text") or ""
+    status = final_state.get("status", "completed")
+    if status != "failed" and final_state.get("error"):
+        status = "failed"
     with create_db_session() as session:
         run = session.get(RunRow, run_id)
         if run is None:
@@ -45,7 +48,7 @@ def run_agent(workspace_id: str, question: str, insights_toggle: bool = False) -
         run.output_text = output_text
         run.provider = final_state.get("provider")
         run.model = final_state.get("model")
-        run.status = final_state.get("status", "completed")
-        run.error_message = final_state.get("error")
+        run.status = status
+        run.error_message = final_state.get("error") or run.error_message
 
     return run_id
