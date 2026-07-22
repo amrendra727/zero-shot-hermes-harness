@@ -25,3 +25,4 @@ class AnalystState(TypedDict, total=False):
     model: str | None
     status: str | None
     error: str | None
+    query_cache: Any | None

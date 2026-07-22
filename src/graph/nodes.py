@@ -1,6 +1,7 @@
 """Graph nodes — analyst capability slot."""
 from __future__ import annotations
 
+from src.graph.cache import QueryCache
 from src.graph.state import AnalystState
 from src.llm.client import LLMClient, load_prompt
 from src.llm.providers.base import LLMError
@@ -41,6 +42,8 @@ def intake_plan(state: AnalystState) -> AnalystState:
     try:
         question = _safe_get(state, "question") or ""
         insights = _safe_get(state, "insights_toggle", False)
+        if not _safe_get(state, "query_cache"):
+            state = _emit(state, query_cache=QueryCache(cache_dir="data/query-cache", ttl_seconds=3600))
         plan = [
             "load workspace schema summary from metadata store",
             "select source: csv dataset view or mssql connection",
@@ -130,7 +133,14 @@ def execute_query(state: AnalystState) -> AnalystState:
             )
             if not expression.strip():
                 expression = "SELECT 1 AS test"
-            result_rows = provider.execute(expression)
+            cache = _safe_get(state, "query_cache")
+            cached = cache.get("mssql", expression) if cache else None
+            if cached and cached[0] is not None:
+                result_rows = cached[0]
+            else:
+                result_rows = provider.execute(expression)
+                if cache:
+                    cache.put("mssql", expression, result_rows)
         elif source_type == "csv":
             import csv
             import sqlite3
@@ -140,6 +150,53 @@ def execute_query(state: AnalystState) -> AnalystState:
             uploads_dir = repo_root / "data" / "uploads" / workspace_id
             if not uploads_dir.exists():
                 return _emit(state, error=f"No datasets found for workspace {workspace_id}.")
+
+            csv_files = sorted(
+                (p for p in uploads_dir.glob("*.csv") if p.is_file()),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if not csv_files:
+                return _emit(state, error=f"No CSV datasets available for workspace {workspace_id}.")
+
+            csv_path = csv_files[0]
+            query_cache_key = f"{csv_path.stat().st_mtime};{expression}"
+            cache = _safe_get(state, "query_cache")
+            cached = cache.get("csv", query_cache_key) if cache else None
+            if cached and cached[0] is not None:
+                result_rows = cached[0]
+            else:
+                with sqlite3.connect(":memory:") as conn:
+                    conn.row_factory = sqlite3.Row
+                    with csv_path.open("r", newline="", encoding="utf-8") as handle:
+                        reader = csv.reader(handle)
+                        headers = next(reader)
+                        safe_headers = [
+                            f"col_{idx}" if not header.strip() else header.strip().replace('"', '""')
+                            for idx, header in enumerate(headers)
+                        ]
+                        table_name = "dataset"
+                        conn.execute(
+                            "CREATE TABLE %s (%s)"
+                            % (
+                                table_name,
+                                ",".join('"%s" TEXT' % name for name in safe_headers),
+                            )
+                        )
+                        placeholders = ",".join(["?"] * len(safe_headers))
+                        conn.executemany(
+                            "INSERT INTO %s VALUES (%s)" % (table_name, placeholders),
+                            reader,
+                        )
+
+                    if not expression.strip():
+                        expression = "SELECT * FROM %s LIMIT 50" % table_name
+                    cursor = conn.execute(expression)
+
+                    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                    result_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                if cache:
+                    cache.put("csv", query_cache_key, result_rows)
         else:
             return _emit(state, error=f"Unsupported source_type in Phase 1: {source_type}")
 
