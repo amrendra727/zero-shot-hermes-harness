@@ -1,6 +1,9 @@
 """Workspace + dataset routes for the analyst agent."""
 from __future__ import annotations
 
+import json
+import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +17,8 @@ from src.domain import AnalystRunResult
 from src.graph.runner import run_agent
 
 router = APIRouter()
+_QUEUE_DIR = Path("data") / "upload-queue"
+_QUEUE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _to_run_result(run: RunRow) -> AnalystRunResult:
@@ -26,6 +31,20 @@ def _to_run_result(run: RunRow) -> AnalystRunResult:
         model=run.model,
         error_message=run.error_message,
     )
+
+
+def _enqueue(workspace_id: str, dataset_id: str, filename: str) -> dict[str, object]:
+    payload = {
+        "job_id": str(uuid.uuid4()),
+        "workspace_id": workspace_id,
+        "dataset_id": dataset_id,
+        "filename": filename,
+        "status": "queued",
+        "attempts": 0,
+    }
+    path = _QUEUE_DIR / f"{payload['job_id']}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return payload
 
 
 @router.post("/workspaces")
@@ -67,13 +86,15 @@ def upload_dataset(workspace_id: str, file: UploadFile, title: str | None = None
     )
     session.add(dataset)
     session.flush()
+    job = _enqueue(workspace_id=workspace_id, dataset_id=str(dataset.id), filename=dataset.source_filename)
 
     return ok({
         "dataset_id": dataset.id,
         "filename": dataset.source_filename,
         "columns": [],
         "row_count": dataset.row_count,
-        "status": "ready",
+        "status": "queued",
+        "job_id": job.get("job_id"),
     })
 
 
@@ -120,3 +141,18 @@ def list_workspace_runs(workspace_id: str, session: Session = Depends(get_sessio
             for row in rows
         ],
     })
+
+
+@router.get("/workspaces/{workspace_id}/queue")
+def list_workspace_queue(workspace_id: str) -> dict:
+    jobs = []
+    if _QUEUE_DIR.exists():
+        for path in _QUEUE_DIR.glob("*.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if payload.get("workspace_id") == workspace_id:
+                    jobs.append(payload)
+            except Exception:
+                continue
+    jobs.sort(key=lambda item: item.get("job_id", ""), reverse=True)
+    return ok({"jobs": jobs, "count": len(jobs)})
