@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Search Portal</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+  <style>
+    .search-shell { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .search-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+    .search-bar input { flex: 1; min-width: 220px; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a2f3a; background: #0f1218; color: #e9ecf1; }
+    .search-bar button { padding: 10px 14px; border-radius: 8px; border: 1px solid #2a2f3a; background: #1c2333; color: #e9ecf1; cursor: pointer; }
+    .search-bar button:hover { background: #243049; }
+    .result-card { border: 1px solid #1f2737; border-radius: 10px; padding: 14px; margin-top: 12px; background: #11151f; }
+    .result-meta { color: #9aa3b2; font-size: 13px; margin-top: 6px; }
+    .snippet { margin-top: 8px; color: #cfd3dc; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; word-break: break-word; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #0f2a18; color: #7ee08a; font-size: 12px; border: 1px solid #143d22; margin-right: 6px; }
+    .empty { color: #9aa3b2; margin-top: 18px; }
+    .error-box { color:#ffb3b3; background:#2a1215; border:1px solid #5c1f24; padding:10px 12px; border-radius:10px; margin-top:12px; }
+  </style>
+</head>
+<body>
+  <main class="search-shell">
+    <header class="topbar">
+      <h1>Document Search Portal</h1>
+      <span class="badge" title="Local Word search">.docx only</span>
+    </header>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>Search your system</h2>
+      <div class="search-bar">
+        <input id="query" placeholder="Search word in Word files..." />
+        <input id="root" placeholder="Folder, e.g. C:\Users\Amrendra Singh\Documents" />
+        <button id="search-btn">Search</button>
+      </div>
+      <div id="status" class="status" hidden></div>
+      <div id="error" class="error-box" hidden></div>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <div class="result-header">
+        <span id="result-count" class="pill">0 results</span>
+        <span id="elapsed" class="result-meta"></span>
+      </div>
+      <div id="result-list"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+  <script>
+    (function () {
+      const q = (id) => document.getElementById(id);
+      const show = (el, msg) => { if (!el) return; el.textContent = msg; el.hidden = false; };
+      const hide = (el) => { if (el) el.hidden = true; };
+
+      async function search() {
+        const query = (q("query")?.value || "").trim();
+        const root = (q("root")?.value || "").trim();
+        if (!query) { show(q("error"), "Type a search word first."); return; }
+        hide(q("error"));
+        q("search-btn").disabled = true;
+        show(q("status"), "Searching...");
+        q("results").hidden = true;
+        const started = performance.now();
+        try {
+          const res = await fetch("/document-search", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ query, root: root || null }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) { throw new Error(body?.detail?.message || `HTTP ${res.status}`); }
+          const data = body.data || body;
+          render(data);
+          const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+          show(q("status"), `Done in ${elapsed}s`);
+        } catch (err) {
+          show(q("error"), err.message || "Search failed.");
+        } finally {
+          q("search-btn").disabled = false;
+        }
+      }
+
+      function render(data) {
+        const results = Array.isArray(data.results) ? data.results : [];
+        q("result-count").textContent = `${results.length} result${results.length === 1 ? "" : "s"}`;
+        q("elapsed").textContent = `root: ${data.root || "~/Documents"}`;
+        const list = q("result-list");
+        list.innerHTML = "";
+        q("results").hidden = results.length === 0;
+        if (results.length === 0) {
+          list.innerHTML = `<div class="empty">No matching Word files found.</div>`;
+          return;
+        }
+        results.forEach((item) => {
+          const card = document.createElement("div");
+          card.className = "result-card";
+          card.innerHTML = `
+            <div>
+              <span class="pill">${escapeHtml(item.filename || "document.docx")}</span>
+              <span class="pill">${(item.score * 100).toFixed(1)}% match</span>
+            </div>
+            <div class="result-meta">${escapeHtml(item.path)}</div>
+            <div class="snippet">${escapeHtml(item.snippet || "")}</div>
+          `;
+          list.appendChild(card);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch] || ch));
+      }
+
+      q("search-btn")?.addEventListener("click", search);
+      q("query")?.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+    })();
+  </script>
+</body>
+</html>

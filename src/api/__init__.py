@@ -30,6 +30,13 @@ def create_app() -> FastAPI:
     app.include_router(runs.router)
     app.include_router(workspace_routes.router)
 
+    try:
+        from src.api import document_search as document_search_routes
+
+        app.include_router(document_search_routes.router)
+    except ModuleNotFoundError:
+        pass
+
     _FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "public"
     if _FRONTEND_DIR.is_dir():
         app.mount("/app", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
