@@ -50,10 +50,9 @@ def test_frontend_served_at_app():
     with _client() as client:
         res = client.get("/app/")
         assert res.status_code == 200
-        assert "UP Police Analyst" in res.text
-        # styles + js referenced (single-origin)
-        assert "styles.css" in res.text
-        assert "app.js" in res.text
+        assert "UP Police Analyst Portal" in res.text
+        assert "Analyst Workspace" in res.text
+        assert "Document Search" in res.text
 
 
 def test_upload_csv_queues_job():
