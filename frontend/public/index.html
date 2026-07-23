@@ -3,100 +3,51 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UP Police Analyst</title>
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <title>UP Police Analyst Portal</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+  <style>
+    .home-shell { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+    .hero { text-align: center; padding: 48px 16px; }
+    .hero h1 { font-size: 2.2rem; margin-bottom: 8px; }
+    .hero p { color: #9aa3b2; font-size: 1.1rem; max-width: 640px; margin: 0 auto 28px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+    .card { border: 1px solid #1f2737; border-radius: 14px; padding: 22px; background: #11151f; text-decoration: none; color: inherit; display: block; transition: transform .05s ease, border-color .15s ease; }
+    .card:hover { transform: translateY(-2px); border-color: #2f3a52; }
+    .card h3 { margin: 0 0 8px; font-size: 1.3rem; }
+    .card p { margin: 0; color: #9aa3b2; font-size: 0.95rem; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #0f2a18; color: #7ee08a; font-size: 12px; border: 1px solid #143d22; margin-top: 10px; }
+    .status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #1c2333; color: #cfd3dc; font-size: 12px; border: 1px solid #2a2f3a; margin-top: 10px; }
+    .footer { margin-top: 36px; color: #6b7280; font-size: 13px; text-align: center; }
+  </style>
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <h1>UP Police Analyst</h1>
-      <span id="provider-badge" class="badge" title="Active LLM provider">…</span>
-    </header>
-
-    <section class="card" id="upload-card">
-      <h2>Workspace</h2>
-      <p class="hint">Upload CSV datasets for the active workspace.</p>
-      <label>
-        Workspace name
-        <input id="workspace-name" value="Zone Review" />
-      </label>
-      <label>
-        Dataset file
-        <input id="dataset-file" type="file" accept=".csv" />
-      </label>
-      <button id="upload-btn">Upload CSV</button>
-      <div id="workspace-id" class="workspace-id" hidden></div>
-      <div id="upload-status" class="status" hidden></div>
-      <div id="upload-error" class="error" hidden></div>
-    </section>
-
-    <section class="card" id="ask-card">
-      <h2>Ask a question</h2>
-      <label>
-        Question
-        <textarea id="question" rows="3" placeholder="e.g., Top 5 stations by total incidents this month."></textarea>
-      </label>
-      <label class="toggle">
-        <input id="insights-toggle" type="checkbox" />
-        Show insights / follow-ups / anomalies
-      </label>
-      <button id="ask-btn">Ask</button>
-      <div id="ask-status" class="status" hidden></div>
-      <div id="ask-error" class="error" hidden></div>
-    </section>
-
-    <section class="card" id="result-card" hidden>
-      <h2>Answer</h2>
-      <p id="answer-text"></p>
-
-      <details class="details">
-        <summary>SQL suggestion</summary>
-        <pre id="sql-suggestion"></pre>
-      </details>
-
-      <details class="details">
-        <summary>Steps/trail</summary>
-        <pre id="steps-trail"></pre>
-      </details>
-
-      <details class="details">
-        <summary>Full trail</summary>
-        <pre id="full-trail"></pre>
-      </details>
-
-      <h3>Result table</h3>
-      <div class="table-wrap">
-        <table id="result-table">
-          <thead id="result-head"></thead>
-          <tbody id="result-body"></tbody>
-        </table>
+  <main class="home-shell">
+    <section class="hero">
+      <h1>UP Police Analyst Portal</h1>
+      <p>Ask questions over CSV workspaces, or search through local Word documents across your folders.</p>
+      <div>
+        <span class="status-pill">NIM · meta/llama-3-70b-instruct</span>
+        <span class="badge">Phase 1 · Phase 2 ready</span>
       </div>
-
-      <h3>Chart</h3>
-      <div id="chart-area" class="chart-area">Chart rendering is deferred to a future phase.</div>
-
-      <h3>Follow-ups</h3>
-      <ul id="follow-ups"></ul>
-
-      <h3>Anomalies</h3>
-      <ul id="anomalies"></ul>
-
-      <button id="download-btn">Download report</button>
     </section>
 
-    <section class="card">
-      <h2>Workspace runs</h2>
-      <button id="refresh-runs-btn">Refresh runs</button>
-      <ul id="run-list"></ul>
+    <section class="cards">
+      <a class="card" href="/app/">
+        <h3>📊 Analyst Workspace</h3>
+        <p>Upload CSVs, ask natural-language questions, inspect SQL suggestions, and download reports.</p>
+        <span class="badge">Open workspace</span>
+      </a>
+
+      <a class="card" href="/document-search.html">
+        <h3>🔍 Document Search</h3>
+        <p>Search inside .docx and .doc files across any folder on this system.</p>
+        <span class="badge">Open document search</span>
+      </a>
     </section>
 
-    <footer class="foot">
-      <span>
-        Document search: <a href="/document-search.html">Document Search Portal</a>
-        · API docs at <a href="/docs">/docs</a> · health at <a href="/health">/health</a>
-      </span>
+    <footer class="footer">
+      API docs at <a href="/docs" style="color:#cfd3dc;">/docs</a> · health at <a href="/health" style="color:#cfd3dc;">/health</a>
     </footer>
   </main>
-  <script src="app.js?v=2"></script>
 </body>
 </html>
