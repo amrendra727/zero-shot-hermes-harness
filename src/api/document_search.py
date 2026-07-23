@@ -48,6 +48,37 @@ def _read_docx_text(path: Path) -> str:
         return ""
 
 
+def _read_doc_text(path: Path) -> str:
+    """Best-effort text extraction from legacy .doc files.
+
+    This does not parse the full Word binary format; it extracts readable
+    text blocks where possible. For full fidelity, prefer converting to
+    .docx or using a dedicated parser.
+    """
+    try:
+        data = path.read_bytes()
+    except Exception:
+        return ""
+    text = ""
+    current: list[str] = []
+    i = 0
+    while i < len(data):
+        # crude printable run detection
+        if 32 <= data[i] <= 126 or data[i] in (9, 10, 13):
+            current.append(chr(data[i]))
+            i += 1
+        else:
+            segment = "".join(current).strip()
+            if len(segment) >= 4:
+                text += segment + " "
+            current = []
+            i += 1
+    segment = "".join(current).strip()
+    if len(segment) >= 4:
+        text += segment + " "
+    return text.strip()
+
+
 def _score_match(text: str, query: str) -> tuple[float, str]:
     """Simple relevance score + snippet extraction."""
     q = query.lower()
@@ -82,11 +113,15 @@ def search_documents(req: SearchRequest) -> dict:
         if depth > max_depth:
             continue
         for filename in filenames:
-            if not filename.lower().endswith(".docx"):
+            lower_name = filename.lower()
+            if not (lower_name.endswith(".docx") or lower_name.endswith(".doc")):
                 continue
             full_path = Path(dirpath) / filename
             try:
-                text = _read_docx_text(full_path)
+                if lower_name.endswith(".docx"):
+                    text = _read_docx_text(full_path)
+                else:
+                    text = _read_doc_text(full_path)
             except Exception:
                 continue
             score, snippet = _score_match(text, query)
